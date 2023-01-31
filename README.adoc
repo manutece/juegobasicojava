@@ -1,0 +1,777 @@
+= Programación 1: Trabajo Práctico
+Manuel Ricci DNI:44421019 <manuricci123@gmail.com>; Manuel Torres_Ciutat DNI:43261817 <manueltorresciutat1@gmail.com>; Tomás Villalba <totovillalba.tv@gmail.com>
+v1, {docdate}. Docentes Leonardo Waingarten y Hernán Rondelli. COM-01.
+:toc:
+:toc-title: Contenidos
+:numbered:
+:source-highligther: coderay
+:tabsize: 4
+
+== Introducción
+
+En la Isla Paradis existen unos malvados gigantes de forma humanoide, llamados kyojines,
+que invaden las ciudades y aplastan todo a su paso. Para combatir a los kyojines las Fuerzas
+Armadas de la Humanidad crearon La Legión de Reconocimiento encargada de exterminarlos.
+
+Mikasa Ackerman, nuestra heroína y la soldada más letal de La Legión de Reconocimiento,
+tiene la tarea de exterminar a todos los kyojines que invadieron la ciudad.
+
+Como el encuentro con los kyojines es muy peligroso, nos encargaron el desarrollo de un
+simulador que permita a la Legión de Reconocimiento entrenarse para eliminar a la mayor
+cantidad posible de kyojines sin perder la vida en el intento.
+
+== Descripción
+
+=== Descripción general del programa
+
+El programa consiste en una personaje, llamada _Mikasa_, que se mueve con _tank controls_, es decir, gira sobre su eje y sólo se mueve en la dirección a la que esté apuntando. Mikasa debe escapar de 5 enemigos que la persiguen, los cuales si la tocan, termina el juego con una derrota. Mikasa tiene la posibilidad de disparar proyectiles que matan el enemigo que toquen y tambíen puede agarrar un objeto que spawnea de manera aleatoria por el mapa, llamado _Suero_ que le otorga la posibilidad de matar al primer enemigo que tenga contacto con ella. Los enemigos asesinados, luego de una cierta cantidad de tiempo, respawnean. Si el personaje logra limpiar a todos los enemigos en pantalla, el juego finalizará con una victoria.
+
+=== Problemas encontrados y soluciones
+
+En primer lugar, una de las mayores dificultades hasta el último momento tuvo que ver con el solapamiento de los obstaculos entre sí y su spawneo en medio de la pantalla, tapando así a Mikasa. Terminamos resolviéndolo creando en los obstaculos un método que chequee si se estan tocando, lo cual de ser así hará que el obstáculo se desplace hacia un costado. Luego, para solucionar el problema de que spawnee en el medio, en el método `juego` dentro de la clase `juego`, cuando le damos las coordenadas aleatorias a los obstáculos, conseguimos mediante el uso de máximos y mínimos, limitar los números aleatorios para que no tomen valores muy cercanos a la posición inicial de Mikasa.
+
+Otro problema que tuvimos tuvo que ver con el tiempo y el contado de ticks en general para poder darle un valor aleatorio al tiempo de spawn del suero y también para poder medir un tiempo de _cooldown_ para el proyectil y el spawn de los kyojines. Primero intentamos crear una variable tiempo que pudiera servir para todos los casos donde lo necesitáramos pero no fue muy útil debido a que a medida que iba creciendo se complicaba poder darle valores aleatorios que se mantuvieran con la crecida del tiempo. Es por esto que decidimos hacer cooldowns para cada cosa que lo necesitara y que fuera decreciendo cuando fuera necesario. De esta forma conseguimos, además de poder hacer funcionar el código como queríamos, que cada objeto tenga su propio cooldown y quede más ordenado y entendible en general.
+
+Un problema que tuvimos que también fue significativo es que al hacer las _colisiones_, priorizaba de manera extraña qué eje cartesiano intepretar como colisión. Para arreglar esto, las colisiones con el eje X las dejamos como estaban y a las del eje Y les pusimos una suma de 5, para que si chocaba abajo se activara esa colisión y no la de X. Esta suma no afectó a la sensación general del juego ni genera una visual extraña y arregló el problema.
+
+En cuarto lugar, tuvimos problemas para plantear cómo funcionaría el _proyectil_. Cuando nos pusimos de acuerdo, habíamos hecho una condición que dependía únicamente de si la barra espaciadora estaba apretada y que el proyectil no estuviera en pantalla. Esto claramente no era satisfactorio ya que al matar a un _kyojin_, se podía disparar otro proyectil bastante rápido y se podía limpiar a los enemigos con extremada facilidad. Es por esto que le colocamos un cooldown y ahora el juego tiene una dificultad bastante mayor.
+
+== Implementación
+
+include::/src/juego/Juego.java[]
+
+=== Clase Proyectil
+----
+    private double x;
+	private double y;
+	private double angulo;
+	private double velocidad;
+	private Image imagen;
+----
+Las variables `X` e `Y` son la poscición del proyectil, el `ángulo` lo usamos para saber para dónde tiene que salir disparado, la `velocidad` es un valor constante para medir que tan rápido avanza y la `imágen` es con que dibujo aparecerá en el juego. 
+----
+public void dibujar(Entorno entorno) {
+		entorno.dibujarImagen(this.imagen, this.x, this.y, this.angulo + Math.PI / 3, 0.1);
+	}
+----
+Este metodo dibuja la `imagen` elegida para el `proyectil`.
+----
+public void avanzar() { 
+		this.x += Math.cos(this.angulo) * this.velocidad;
+		this.y += Math.sin(this.angulo) * this.velocidad;
+	}
+----
+Este método hace avanzar al `proyectil` sumándole el producto entre el coseno/seno del `angulo` y la `velocidad` a la coordenada `X` o `Y` según corresponda.
+----
+public boolean chocasteConObstaculo(Obstaculo[] obstaculos) {
+		for (int i = 0; i < obstaculos.length; i++) {
+			if (this.y > (obstaculos[i].getY() - obstaculos[i].getAlto() / 2)
+					&& this.y < (obstaculos[i].getY() + obstaculos[i].getAlto() / 2)) {
+				if (this.x < (obstaculos[i].getX() + obstaculos[i].getAncho() / 2) && this.x > obstaculos[i].getX()) {
+					return true;
+				}
+				if (this.x > (obstaculos[i].getX() - obstaculos[i].getAncho() / 2) && this.x < obstaculos[i].getX()) {
+					return true;
+				}
+
+			}
+			if (this.x < (obstaculos[i].getX() + obstaculos[i].getAncho() / 2)
+					&& this.x > (obstaculos[i].getX() - obstaculos[i].getAncho() / 2)) {
+				if (this.y > (obstaculos[i].getY() - obstaculos[i].getAlto() / 2) - 5
+						&& this.y < obstaculos[i].getY()) {
+					return true;
+				}
+				if (this.y < (obstaculos[i].getY() + obstaculos[i].getAlto() / 2) + 5
+						&& this.y > obstaculos[i].getY()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+----
+Este método verifica si el `proyectil` choca con un `obstaculo` comparando las coordenadas `X` e `Y` del `proyectil` con la del `obstáculo`.
+----
+public boolean chocasteConEntorno(Entorno entorno) {
+		if (this.x > entorno.ancho()) {
+			return true;
+		}
+		if (this.x < 0) {
+			return true;
+		}
+		if (this.y > entorno.alto()) {
+			return true;
+		}
+		if (this.y < 0) {
+			return true;
+		}
+		return false;
+	}
+----
+Este método verifica si el `proyectil` choca con el `entorno` comparando las coordenadas `X` e `Y` del `proyectil` con el `ancho` y `alto` del `entorno`.
+----
+	public boolean chocasteConKyojin(Kyojin kyojin) {
+		if (kyojin != null) {
+			if (this.y > (kyojin.getY() - 15) && this.y < (kyojin.getY() + 15)) {
+				if (this.x < (kyojin.getX() + 15) && this.x > kyojin.getX()) {
+					return true;
+				}
+				if (this.x > (kyojin.getX() - 15) && this.x < kyojin.getX()) {
+					return true;
+				}
+			}
+			if (this.x < (kyojin.getX() + 15) && this.x > (kyojin.getX() - 15)) {
+				if (this.y > (kyojin.getY() - 15) - 5 && this.y < kyojin.getY()) {
+					return true;
+				}
+				if (this.y < (kyojin.getY() + 15) + 5 && this.y > kyojin.getY()) {
+					return true;
+				}
+			}
+		}
+		return false;
+
+	}
+}
+----
+Este método verifica si el `proyectil` choca con un `Kyojin` comparando las coordenadas X e Y del `proyectil` con la del `Kyojin`.
+
+=== Clase Suero
+----
+    private double x;
+	private double y;
+	private Image imagen;
+----
+Las variables `X` e `Y` son la poscición del suero y la `imágen` es con que dibujo aparecerá en el juego. 
+----
+public void dibujar(Entorno entorno) {
+		entorno.dibujarImagen(this.imagen, this.x, this.y, this.angulo, 0.07);
+	}
+----
+Este método dibuja la `imagen` elegida para el `suero`.
+----
+public double getX() {
+		return x;
+	}
+----
+Este método devuelve el valor `X` del `suero`.
+----
+	public double getY() {
+		return y;
+	}
+----
+Este método devuelve el valor `Y` del `suero`.
+
+=== Clase Obstaculo
+----
+	private double x;
+	private double y;
+	private int alto;
+	private int ancho;
+	private double valorCasa;
+	private Image casa1;
+	private Image casa2;
+	private Image casa3;
+----
+Las variables `X` e `Y` son la poscición del obstáculo, el `alto` y el `ancho` hacen referencia a su tamaño, el `valorCasa` identifica con cuál imágen se va a dibujar y finalmente `casa1`, `casa2` y `casa3` son las diferentes imágenes.
+----
+public void dibujar(Entorno e) {
+		double i = Math.random() * 10;
+		if (valorCasa <= 3) {
+			e.dibujarImagen(casa1, this.x, this.y, 0, 1.2);
+
+		} else {
+			if (valorCasa <= 6) {
+				e.dibujarImagen(casa2, this.x, this.y, 0, 1.2);
+			} else {
+				e.dibujarImagen(casa3, this.x, this.y, 0, 1.2);
+			}
+		}
+	}
+----
+Este método dibuja una entre tres imágenes elegidas para los `obstaculos`, para esto generamos un número aleatorio y según el valor que toca se elige la `imagen`.
+----
+public double getX() {
+		return x;
+	}
+----
+Este método devuelve el valor de `x` del `obstáculo`.
+----
+	public double getY() {
+		return y;
+	}
+----
+Este método devuelve el valor de `Y` del `obstáculo`.
+----
+public int getAlto() {
+		return alto;
+	}
+----
+Este método devuelve el `alto` del `obstáculo`.
+----
+public int getAncho() {
+		return ancho;
+	}
+----
+Este método devuelve el `ancho` del `obstáculo`.
+
+=== Clase Mikasa
+----
+	private double x;
+	private double y;
+	private double velocidad;
+	private double angulo;
+	private Image imagen;
+----
+Las variables `X` e `Y` son la poscición de Mikasa, el `ángulo` lo usamos para saber para dónde va a disparar, la `velocidad` es un valor constante para medir que tan rápido avanza y la `imágen` es con que dibujo aparecerá en el juego. 
+----
+	public void dibujar(Entorno e) {
+		e.dibujarImagen(this.imagen, this.x, this.y, this.angulo, 1);
+	}
+----
+Este método dibuja la `imagen` elegida para `Mikasa`.
+----
+	public void girarDerecha() {
+		this.angulo = this.angulo + Math.PI / 60;
+		if (this.angulo > Math.PI * 2) {
+			this.angulo = this.angulo - Math.PI * 2;
+		}
+	}
+----
+Este método hace girar a `Mikasa` en sentido de las agujas del reloj sumándole un valor en radianes a su `angulo`.
+----
+public void girarIzquierda() {
+		this.angulo = this.angulo - Math.PI / 60;
+		if (this.angulo < 0) {
+			this.angulo = this.angulo + Math.PI * 2;
+		}
+	}
+----
+Este método hace girar a `Mikasa` en sentido contrario a las agujas del reloj restandole un valor en radianes a su `angulo`.
+----
+public void avanzar(Entorno entorno) {
+		this.x += Math.cos(this.angulo) * this.velocidad;
+		this.y += Math.sin(this.angulo) * this.velocidad;
+		if (this.x > entorno.ancho() - 15) {
+			this.x = entorno.ancho() - 15;
+		}
+		if (this.x < 0 + 15) {
+			this.x = 0 + 15;
+		}
+		if (this.y > entorno.alto() - 15) {
+			this.y = entorno.alto() - 15;
+		}
+		if (this.y < 0 + 15) {
+			this.y = 0 + 15;
+		}
+    }
+----
+Este método hace avanzar al `Mikasa` sumándole el producto entre el coseno/seno del `angulo` y la `velocidad` a la coordenada `X` o `Y` según corresponda, además hace que no pueda avanzar si esta chocando con el `entorno`.
+----
+public void detenerEnFrenteDeObstaculos(Obstaculo[] obstaculos) {
+		for (int i = 0; i < obstaculos.length; i++) {
+			if (this.y + 15 > (obstaculos[i].getY() - obstaculos[i].getAlto() / 2)
+					&& this.y - 15 < (obstaculos[i].getY() + obstaculos[i].getAlto() / 2)) {
+				if (this.x - 15 < (obstaculos[i].getX() + obstaculos[i].getAncho() / 2)
+						&& this.x > obstaculos[i].getX()) {
+					this.x = (obstaculos[i].getX() + obstaculos[i].getAncho() / 2) + 15;
+				}
+				if (this.x + 15 > (obstaculos[i].getX() - obstaculos[i].getAncho() / 2)
+						&& this.x < obstaculos[i].getX()) {
+					this.x = (obstaculos[i].getX() - obstaculos[i].getAncho() / 2) - 15;
+				}
+
+			}
+			if (this.x - 15 < (obstaculos[i].getX() + obstaculos[i].getAncho() / 2)
+					&& this.x + 15 > (obstaculos[i].getX() - obstaculos[i].getAncho() / 2)) {
+				if (this.y + 15 > (obstaculos[i].getY() - obstaculos[i].getAlto() / 2) - 5
+						&& this.y < obstaculos[i].getY()) {
+					this.y = (obstaculos[i].getY() - obstaculos[i].getAlto() / 2) - 5 - 15;
+				}
+				if (this.y - 15 < (obstaculos[i].getY() + obstaculos[i].getAlto() / 2) + 5
+						&& this.y > obstaculos[i].getY()) {
+					this.y = (obstaculos[i].getY() + obstaculos[i].getAlto() / 2) + 5 + 15;
+				}
+			}
+		}
+	}
+----
+Este método verifica si `Mikasa` choca con un obstaculo comparando sus coordenadas `X` e `Y` con la del `obstaculo`.
+----
+public boolean chocasteConKyojines(Kyojin kyojin) {
+		if (kyojin != null) {
+			if (this.y + 15 > (kyojin.getY() - 15) && this.y - 15 < (kyojin.getY() + 15)) {
+				if (this.x - 15 < (kyojin.getX() + 15) && this.x + 15 > kyojin.getX()) {
+					return true;
+				}
+				if (this.x + 15 > (kyojin.getX() - 15) && this.x - 15 < kyojin.getX()) {
+					return true;
+				}
+			}
+			if (this.x - 15 < (kyojin.getX() + 15) && this.x + 15 > (kyojin.getX() - 15)) {
+				if (this.y + 15 > (kyojin.getY() - 15) - 5 && this.y - 15 < kyojin.getY()) {
+					return true;
+				}
+				if (this.y - 15 < (kyojin.getY() + 15) + 5 && this.y + 15 > kyojin.getY()) {
+					return true;
+				}
+			}
+		}
+		return false;
+
+	}
+----
+Este método verifica si `Mikasa` choca con un `Kyojin` comparando sus coordenadas `X` e `Y` con las del `kyojin`.
+----
+public boolean agarrarsteSuero(Suero[] suero) {
+		for (int i = 0; i < suero.length; i++) {
+
+			if (this.x + 15 > (suero[i].getX() - 15) && this.x - 15 < (suero[i].getX() + 15)) {
+				if (this.y - 15 < (suero[i].getY() + 15) && this.y + 15 > suero[i].getY()) {
+					return true;
+				}
+				if (this.y + 15 > (suero[i].getY() - 15) && this.y - 15 < suero[i].getY()) {
+					return true;
+				}
+			}
+			if (this.y - 15 < (suero[i].getY() + 15) && this.y + 15 > (suero[i].getY() - 15)) {
+				if (this.x + 15 > (suero[i].getX() - 15) && this.x - 15 < suero[i].getX()) {
+					return true;
+				}
+				if (this.x - 15 < (suero[i].getX() + 15) && this.x + 15 > suero[i].getX()) {
+					return true;
+				}
+			}
+
+		}
+		return false;
+	}
+----
+Este método verifica si `Mikasa` choca con el `suero` comparando sus coordenadas `X` e `Y` con las del `suero`.
+----
+ public double getX() {
+		return x;
+	}
+----
+Este método devuelve el valor `X` de `Mikasa.
+----
+	public double getY() {
+		return y;
+	}
+----
+Este método devuelve el valor `Y` de `Mikasa`.
+----
+	public double getAngulo() {
+		return angulo;
+	}
+----
+Este método devuelve el `angulo` de `Mikasa`.
+----
+public Proyectil disparar() {
+		Proyectil proyectil = new Proyectil(this.x,this.y,this.angulo);
+		return proyectil;
+	}
+----
+Este método crea el proyectil cuando se lo llama.
+
+=== Clase Kyojin
+----
+    private double x;
+	private double y;
+	private double velocidad;
+	private Image imagen;
+----
+Las variables `X` e `Y` son la poscición del Kyojin, la `velocidad` es un valor constante para medir que tan rápido avanza y la `imagen` es con que dibujo aparecerá en el juego. 
+----
+	public void dibujar(Entorno e) {
+		e.dibujarImagen(this.imagen, this.x, this.y, 0, 0.2);
+	}
+----
+Este método dibuja la `imagen` elegida para el `Kyojin`.
+----
+	public void perseguirMikasa(Mikasa mikasa) {
+		if (this.x < mikasa.getX()) {
+			this.x = this.x + this.velocidad;
+		}
+		if (this.x > mikasa.getX()) {
+			this.x = this.x - this.velocidad;
+		}
+		if (this.y < mikasa.getY()) {
+			this.y = this.y + this.velocidad;
+		}
+		if (this.y > mikasa.getY()) {
+			this.y = this.y - this.velocidad;
+		}
+
+	}
+----
+Este método hace que el `Kyojin` persiga a `Mikasa` comparando sos coordenadas en `X` e `Y` con las de `Mikasa` y sumando o restando según se necesite.
+----
+public void limiteConElEntorno(Entorno e) {
+		if (this.x < 0) {
+			this.x = 0;
+		}
+		if (this.x > e.ancho()) {
+			this.x = e.ancho();
+		}
+		if (this.y < 0) {
+			this.y = 0;
+		}
+		if (this.y > e.ancho()) {
+			this.y = e.ancho();
+		}
+	}
+----
+Este método verifica si el `Kyojin` choca con el `entorno` comparando las coordenadas `X` e `Y` del `Kyojin` con el `ancho` y `alto` del `entorno`.
+----
+	public void evitarSuperposiconConKyojines(Kyojin[] kyojines) {
+		for (int i = 0; i < kyojines.length; i++) {
+			if (kyojines[i] != null) {
+				if (this.y + 15 > (kyojines[i].getY() - 15) && this.y - 15 < (kyojines[i].getY() + 15)) {
+					if (this.x - 15 < (kyojines[i].getX() + 15) && this.x > kyojines[i].getX()) {
+						this.x = (kyojines[i].getX() + 15) + 15;
+					}
+					if (this.x + 15 > (kyojines[i].getX() - 15) && this.x < kyojines[i].getX()) {
+						this.x = (kyojines[i].getX() - 15) - 15;
+					}
+				}
+				if (this.x - 15 < (kyojines[i].getX() + 15) && this.x + 15 > (kyojines[i].getX() - 15)) {
+					if (this.y + 15 > (kyojines[i].getY() - 15) - 5 && this.y < kyojines[i].getY()) {
+						this.y = (kyojines[i].getY() - 15) - 5 - 15;
+					}
+					if (this.y - 15 < (kyojines[i].getY() + 15) + 5 && this.y > kyojines[i].getY()) {
+						this.y = (kyojines[i].getY() + 15) + 5 + 15;
+					}
+				}
+			}
+		}
+	}
+----
+Este método verifica si el `Kyojin` choca con otro `Kyojin` comparando las coordenadas `X` e `Y` del `Kyojin` con la de otro `Kyojin`.
+----
+	public void detenerEnfrenteDeObstaculo(Obstaculo[] obstaculos) {
+		for (int i = 0; i < obstaculos.length; i++) {
+			if (this.y + 15 > (obstaculos[i].getY() - obstaculos[i].getAlto() / 2)
+					&& this.y - 15 < (obstaculos[i].getY() + obstaculos[i].getAlto() / 2)) {
+				if (this.x - 15 < (obstaculos[i].getX() + obstaculos[i].getAncho() / 2)
+						&& this.x > obstaculos[i].getX()) {
+					this.x = (obstaculos[i].getX() + obstaculos[i].getAncho() / 2) + 15;
+				}
+				if (this.x + 15 > (obstaculos[i].getX() - obstaculos[i].getAncho() / 2)
+						&& this.x < obstaculos[i].getX()) {
+					this.x = (obstaculos[i].getX() - obstaculos[i].getAncho() / 2) - 15;
+				}
+
+			}
+			if (this.x - 15 < (obstaculos[i].getX() + obstaculos[i].getAncho() / 2)
+					&& this.x + 15 > (obstaculos[i].getX() - obstaculos[i].getAncho() / 2)) {
+				if (this.y + 15 > (obstaculos[i].getY() - obstaculos[i].getAlto() / 2) - 5
+						&& this.y < obstaculos[i].getY()) {
+					this.y = (obstaculos[i].getY() - obstaculos[i].getAlto() / 2) - 5 - 15;
+				}
+				if (this.y - 15 < (obstaculos[i].getY() + obstaculos[i].getAlto() / 2) + 5
+						&& this.y > obstaculos[i].getY()) {
+					this.y = (obstaculos[i].getY() + obstaculos[i].getAlto() / 2) + 5 + 15;
+				}
+			}
+		}
+	}
+----
+Este método verifica si el `Kyojin` choca con un obstaculo comparando las coordenadas `X` e `Y` del `Kyojin` con la de otro `Kyojin`.
+----
+	public double getX() {
+		return x;
+	}
+----
+Este método devuelve el valor de `X` del `Kyojin`.
+----
+	public double getY() {
+		return y;
+	}
+----
+Este método devuelve el valor de `Y` del `Kyojin`.
+
+=== Clase Juego
+----
+public class Juego extends InterfaceJuego {
+
+	private Entorno entorno;
+	private Obstaculo[] obstaculos;
+	private Mikasa mikasa;
+	private Kyojin[] kyojines;
+	private Proyectil[] proyectil;
+	private Suero[] suero;
+	private Image fondo;
+	private boolean op;
+	private int contadorKyojines;
+	private boolean ganaste;
+	private boolean perdiste;
+	private double cooldownSuero;
+	private double cooldownKyojines;
+	private double cooldownProyectil;
+----
+Acá se ven las variables que son necesarias para el funcionamiento correcto del juego. `Entorno` es el objeto que controla el tiempo y las visuales en general, indispensable para el funcionamiento del juego. El array `obstaculos` corresponde a los obstáculos que figurarán en el mapa. `Mikasa` corresponde al personaje principal del juego. El array `kyojines` corresponde a los enemigos que aparecerán en pantalla. los arrays `proyectil` y `suero` corresponden a el proyectil que Mikasa puede disparar y al objeto que Mikasa puede agarrar para tener poderes. `fondo` es la imagen del fondo del programa. `op` es un valor booleano que si Mikasa agarra el suero se hará true para que puedan entrar todos los condicionales relacionados a la eliminación de kyojines por contacto y que no termine el juego al tocarla, ya que esta es inmune a la muerte si tiene el suero. el `contadorKyojines` es un contador que registra los kyojines asesinados para poder mostrarlos en pantalla. `gameover` es un valor booleano que determina si el juego ya finalizó o no, por lo tanto de finalizar, no se ejecuta ningún comando del juego más que los que tengan que ver con las pantallas finales. Por último, `cooldownSuero`, `cooldownKyojines` y `cooldownProyectil` son tiempos de enfriamiento para que el proyectil no se pueda tirar sin parar, los kyojines spawneen con un tiempo de descanso de por medio y el suero aparezca en intervalos aleatorios que dependan de este cooldown.
+
+----
+public Juego() {
+		this.entorno = new Entorno(this, "Prueba del Entorno", 800, 600);
+		this.fondo = Herramientas.cargarImagen("fondo.png");
+		kyojines = new Kyojin[5];
+		mikasa = new Mikasa(entorno.ancho() / 2, entorno.alto() / 2);
+		obstaculos = new Obstaculo[6];
+		numeroDeKyojinesMuertos = 0;
+		tiempoDeAparicionDeKyojines = 400;
+		cooldownProyectil = 0;
+		timerDeDelayDeSuero = (Math.random() + 0.1) * (750 - 560 + 1) + 560;
+		suero = new Suero[1];
+----
+El método juego arranca con la inicialización de todas las variables importantes, se puede ver que el `timerDeDelayDeSuero` es un valor aleatorio entre 750 y 560, por lo tanto cuando pase una cantidad de ticks aleatoria dentro de esos valores se spawneará un suero, el proyectil tiene su cooldown en 0 ya que el proyectil debe poder dispararse desde el principio, se inician los arrays de `obstaculos`, `kyojines`, `proyectil` y `suero`. Se otorga a `mikasa` la posición del centro de la pantalla para que spawnee ahí.
+
+----
+for (int i = 0; i < obstaculos.length; i++) {
+			int minX = 0 + 90;
+			int maxX = entorno.ancho() - 90;
+			int minY = 0 + 90;
+			int maxY = entorno.alto() - 90;
+			double x = (Math.random() + 0.01) * (maxX - minX + 1) + minX;
+			double y = (Math.random() + 0.01) * (maxY - minY + 1) + minY;
+			while (x < entorno.ancho() / 2 + 90 && x > entorno.ancho() / 2 - 90 && y < entorno.alto() / 2 + 90
+					&& y > entorno.alto() / 2 - 90) {
+				x = (Math.random() + 0.01) * (maxX - minX + 1) + minX;
+				y = (Math.random() + 0.01) * (maxY - minY + 1) + minY;
+			}
+			obstaculos[i] = new Obstaculo(x, y, Math.random() * 10);
+----
+En este ciclo for se le otorga a los obstáculos su posición de `x`,`y`, y se determina que imagen de casa se va a utilizar. Mediante el uso de la funcion aleatoria y la implementación de valores mínimos y máximos se restringe el spawneo de los obstaculos para que no aparezcan muy cercanos al borde de la pantalla y luego se corre un ciclo while en el que se chequea que, en el caso de que el obstáculo aparezca muy cercano al medio, se vuelva a calcular su valor de `x` y de `y`, ya que de estar muy cerca spawnearía encima de Mikasa. Al final se crea para cada obstáculo del array `obstaculos` un nuevo obstáculo con la posición `x` e `y` aleatorias y ahí mismo se le da el valor aleatorio para las funciones de dibujar.
+
+----
+for (int k = 0; k < kyojines.length; k++) {
+			double xk = 0;
+			int minY = 0 + 90;
+			int maxY = entorno.alto() - 90;
+			double lado = Math.random();
+			if (lado <= 0.5) {
+				xk = (Math.random() + 0.01) * (150 - 40 + 1) + 40;
+			} else {
+				xk = (Math.random() + 0.01) * ((entorno.ancho() - 40) - (entorno.ancho() - 150) + 1)
+						+ (entorno.ancho() - 150);
+			}
+			double yk = (Math.random() + 0.1) * (maxY - minY + 1) + minY;
+
+			kyojines[k] = new Kyojin(xk, yk);
+----
+
+En este ciclo for se construyen los kyojines del array `kyojines`, chequeando que spawneen en una posición aleatoria dentro de un rango de `x` que permita a Mikasa poder moverse al inicio del juego ya que el método totalmente aleatorio podía dar como resultado un kyojin spawneando muy cerca de Mikasa y haciendo perder el juego casi al instante. Para poder lograr que esto funcione, se crea un número random del 0 al 1, el cual de ser mayor a 0,5, los kyojines van a spawnear del lado izquierdo de la pantalla en un `y` totalmente aleatorio y un `x` restringido a valores de 150 a 40. Si el número random es mayor a 0,5, el spawn de los kyojines va a ser igualmente en un valor `y` aleatorio, pero en un `x` del lado derecho restringido a los valores del ancho del entorno - 40 y el ancho del entorno - 150. Al final, se crea cada kyojin de `kyojines` con las coordenadas obtenidas en el ciclo for. 
+Cabe destacar que no nos preocupamos por el solapamiento de kyojines ya que el método `chocasteKyojin` nos asegura que, de colisionar dos kyojines en su aparición, se "despegarán".
+
+----
+this.entorno.iniciar();
+----
+Inicia el entorno y la ventana del programa.
+----
+		entorno.dibujarImagen(fondo, entorno.ancho() / 2, entorno.alto() / 2, 0, 2);
+		mikasa.dibujar(entorno);
+		mikasa.chocasteObstaculo(this.obstaculos);
+----
+Primero tenemos el dibujo del `fondo` y de `mikasa`, donde básicamente el entorno los muestra en pantalla. También se encuentra el método `mikasa.chocasteObstaculo()` que toma como valor el array de `obstaculos` y a raíz de eso chequea cada vez que `mikasa` colisione con un obstáculo y cómo deberá comportarse.
+----
+		for (int i = 0; i < kyojines.length; i++) { // Comportamiento kyojines
+			if (kyojines[i] != null) {
+				kyojines[i].dibujar(entorno);
+				kyojines[i].perseguir(mikasa);
+				kyojines[i].chocasteObstaculo(this.obstaculos);
+				kyojines[i].colisionKyojines(kyojines);
+			}
+		}
+		
+----        
+En este ciclo `for` se recorre a todo el array de kyojines para dibujarlos, darles el comportamiento de que persigan a mikasa y sus comportamientos en cuanto a las colisiones. Esto siempre y cuando dicho kyojin no sea `null`, ya que si es null no debería existir.
+----
+		for (int i = 0; i < obstaculos.length; i++) {
+			obstaculos[i].chocasteObstaculo(obstaculos);
+			obstaculos[i].dibujar(entorno);
+		}
+
+----
+En este ciclo `for` se recorre a todos el array de los obstáculos para dibujarlos y otogarles el comportamiento de colisión, por si spawnean encimados.
+----
+if (this.suero[0] != null) {
+
+				suero[0].dibujar(entorno);
+				// mikasa agarra suero
+				if (mikasa.agarrarSuero(suero)) {
+					op = true;
+					suero[0] = null;
+				}
+			}
+----
+En este condicional, en el caso de que `suero` exista, se lo dibuja. También se chequea que si `mikasa` colisiona con este suero, lo "agarre" y se active el boolean `op`, el cual le permite a `mikasa` poder derrotar a un kyojin con sólo tocarlo. Luego de que lo agarre, el suero se convierte en `null` porque mikasa ya se lo agarró.
+----
+
+			if (this.suero[0] == null) {
+				if (cooldownSuero < 1) {
+					suero[0] = new Suero((Math.random() + 0.1) * ((entorno.ancho() - 60) - 60),
+							(Math.random() + 0.1 * ((entorno.alto() - 60) - 60)));
+					cooldownSuero = (Math.random() + 0.1) * (750 - 560 + 1) + 560;
+				} else {
+					cooldownSuero--;
+				}
+			}
+			
+----
+En este condicional se chequea que el `cooldown` de `suero` sea menor a 1, por lo tanto habría llegado a su fin y sería hora de que vuelva a aparecer. Cuando esto ocurre, se crea otro `suero` en una posicion aleatoria del mapa y el `cooldown` se resetea a un valor aleatorio entre 750 y 560. De no haber llegado a su fin, el `cooldown` decrece por 1, hasta asi llegar a 0 y poder entrar en el primer `if`.
+----
+if (entorno.estaPresionada(entorno.TECLA_DERECHA))
+	mikasa.girarDer();
+
+if (entorno.estaPresionada(entorno.TECLA_IZQUIERDA)) // Comportamiento mikasa
+	mikasa.girarIzq();
+
+if (entorno.estaPresionada(entorno.TECLA_ARRIBA))
+	mikasa.avanzar(entorno);
+----
+En estos 3 condicionales se maneja el movimiento de `mikasa`. De apretarse la tecla derecha o la izquierda `mikasa` girará en la dirección deseada y de apretarse la tecla de arriba, `mikasa` avanzará.
+----
+if (entorno.estaPresionada(entorno.TECLA_ESPACIO) && proyectil[0] == null && cooldownProyectil < 1) {	
+				proyectil[0] = new Proyectil(mikasa);
+				cooldownProyectil = 200;
+			}
+----
+Acá se maneja el disparo del `proyectil`. De no existir un proyectil y si su `cooldown` es 0, al tocar la barra espaciadora se disparará un `proyectil` nuevo, el cual sale de la posicion de `mikasa` y sigue en su ángulo hacia adelante. Su `cooldown` se resetea luego de disparar, para no poder matar a los kyojines extremadamente rápido.
+----
+if (proyectil[0] == null) {
+				if (cooldownProyectil > 0) {
+					cooldownProyectil--;
+					entorno.cambiarFont("Arial", 18, Color.black);
+					entorno.escribirTexto("Proyectil listo en: " + (cooldownProyectil), entorno.ancho() - 200,
+							entorno.alto() - 30);
+				} else {
+					cooldownProyectil = 0;
+					entorno.cambiarFont("Arial", 18, Color.black);
+					entorno.escribirTexto("Proyectil listo", entorno.ancho() - 200, entorno.alto() - 30);
+				}
+			}
+----
+En el caso de que el `proyectil` no exista y su `cooldown` todavía no haya terminado, este enfriamiento se disminuye y se notifica en pantalla al jugador lo que falta para poder volver a disparar con escritura en pantalla. En el caso de que el `cooldown` sea menor a 0, se fija su valor en 0 ya que su valor podría seguir disminuyendo de manera indeterminada hasta que el jugador dispare y se notifica al jugador que esta listo para disparar.
+----
+if (proyectil[0] != null) {
+				proyectil[0].dibujar(entorno);
+				proyectil[0].avanzar();
+				if (proyectil[0].chocasteEntorno(entorno) || proyectil[0].chocasteObstaculo(obstaculos)) {
+					proyectil[0] = null;
+				}
+			}
+----
+En este fragmento de código se maneja el movimiento, el dibujado y la colisión del `proyectil`, de tal forma que cuando este exista, no pare de avanzar hasta chocar o con el `entorno` o con los `obstaculos` o con un `kyojin`. Cuando choca con algo, el proyectil desaparece y pasa a ser `null`.
+----
+for (int i = 0; i < kyojines.length; i++) {
+			if (proyectil[0] != null) {
+				if (proyectil[0].chocasteKyojin(kyojines[i])) { // proyectil mata kyojines
+					kyojines[i] = null;
+					contadorKyojines++;
+					proyectil[0] = null;
+				}
+			}
+		}
+----
+Acá se arma el asesinato de un `kyojin` mediante impacto con un `proyectil`. Un ciclo `for` recorre todos los `kyojines` y si el `proyectil` choca contra alguno, ese `kyojin` pasa a ser `null` y el contador de muerte de kyojines es aumentado. El proyectil es eliminado.
+----
+for (int i = 0; i < kyojines.length; i++) {
+				if (mikasa.colisionKyojines(kyojines[i]) && op == true) { // muerte kyojin colison mikasa
+					kyojines[i] = null;
+					contadorKyojines++;
+					op = false;
+				}
+			}
+----
+En este fragmento de código se programa el matar `kyojines` con el `suero`. Si `mikasa` colisiona con un `kyojin` y `op` es `true`, este muere.
+----
+int kVivos = 0;
+			for (int k = 0; k < kyojines.length; k++) {
+				if (kyojines[k] != null) {
+					kVivos = kVivos + 1;
+				}
+			}
+----
+Se crea una variable `kVivos` que cada tick se reinicia a 0. Esto es porque, luego de que se inice en 0, comienza un ciclo `for` en el que se recorren todos los `kyojines` para ver cuántos no son null, y así sumarlos. Esto será importante para ganar el juego, ya que si `kVivos` llegara a 0, se ganaría.
+
+----
+	for (int i = 0; i < kyojines.length; i++) {
+				if (kyojines[i] == null) {
+					if (cooldownKyojines < 1) {
+						int maxY = entorno.alto() - 60;
+						int minY = 0 + 60;
+						kyojines[i] = new Kyojin((Math.random() + 0.1) * ((entorno.ancho() - 60) - 60),
+								(Math.random() + 0.1) * (maxY - minY + 1) + minY);
+						cooldownKyojines = 600;
+					} else {
+						cooldownKyojines--;
+					}
+				}
+			}
+----
+En este ciclo `for` se recorre el `array` de los `Kyojines`. Si un  `Kyojin` es `null` se va a ir restando `cooldownKyojines`, cuando este sea menor que 1 se va a generar un nuevo `Kyojin` en una posicion random y el `cooldownKyojines` va a volver a ser 500.
+----
+		entorno.cambiarFont("Arial", 18, Color.black);
+		entorno.escribirTexto("Kyojines asesinados:" + (contadorKyojines), entorno.ancho() - 200, 0 + 30);
+----
+Se dibuja el ´cooldownKyojines´ en pantalla y se muestra los `kyojines` asesinados.
+
+----
+if (kVivos == 0) {
+				ganaste = true;
+----
+Se indica la victoria del juego si la cantidad de ´kyojines´ vivos es igual a 0.
+
+----
+for (int i = 0; i < kyojines.length; i++) {
+				if (mikasa.colisionKyojines(kyojines[i]) && op != true) { // muerte mikasa colision kyojin
+					perdiste = true;
+				}
+			}
+----
+Se indica la derrota del juego si un `kyojin` toca a `mikasa` y `op` es `false`.
+
+----
+if (ganaste) {
+			entorno.dibujarRectangulo(entorno.ancho() / 2, entorno.alto() / 2, entorno.ancho(), entorno.alto(), 0,
+					Color.BLACK);
+			entorno.cambiarFont("Arial", 40, Color.green); // cuando ganas la partida
+			entorno.escribirTexto("GANASTE", entorno.ancho() - 500, 200);
+			entorno.cambiarFont("Arial", 20, Color.white);
+			entorno.escribirTexto("Presiona ENTER para salir", entorno.ancho() - 520, 300);
+			if (entorno.estaPresionada(entorno.TECLA_ENTER)) {
+				System.exit(0);
+			}
+		}
+----
+
+Si el jugador gana, se imprime en la pantalla un cartel que dice ganaste y si el jugador toca la tecla enter el juego se cierra.
+
+----
+if (perdiste) {
+			entorno.dibujarRectangulo(entorno.ancho() / 2, entorno.alto() / 2, entorno.ancho(), entorno.alto(), 0,
+					Color.black);
+			entorno.cambiarFont("Arial", 40, Color.red);
+			entorno.escribirTexto("PERDISTE", entorno.ancho() - 500, 200);
+			entorno.cambiarFont("Arial", 20, Color.white);
+			entorno.escribirTexto("Presiona ENTER para salir", entorno.ancho() - 520, 300);
+			if (entorno.estaPresionada(entorno.TECLA_ENTER)) {
+				System.exit(0);
+			}
+		}
+----
+
+Si el jugador pierde, se imprime en pantalla un cartel que dice perdiste y si el jugador toca la tecla enter el juego se cierra.
+
+== Conclusión
+
+En conclusión, el trabajo fue una experiencia complicada con mucho testeo y prueba y error, tuvo momentos estresantes por situaciones que todavía capaz no terminamos de comprender porqué ocurrían.
+
+El usar Git hizo todo bastante cómodo y sencillo ya que nos ayuda a saber qué hizo cada uno y poder ver las distintas versiones del trabajo.
+
+Fue un trabajo que nos pareció divertido a momentos y molesto en otros pero en general fue una experiencia muy buena. 
+
+Estamos conformes con cómo pudimos resolver ciertas dudas y problemas que se nos presentaron aunque hubo ciertos problemas que sentimos que fueron más prueba y error que otra cosa.
+
+Nos vamos de este tp con la enseñanza de que no siempre se necesita juntarse o estar comunicado durante el trabajo en el tp ya que con herramientas como git pudimos hacer cosas cada uno desde su casa y poder trabajar en los horarios que a cada uno se le hicieran cómodos.
